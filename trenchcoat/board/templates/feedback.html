@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Feedback · Trenchcoat{% endblock %}
+{% block content %}
+
+<section class="section">
+  <h2 class="section-title">💰 Feedback bounty tracker <span class="dim">5 × $250 for the most useful reports</span></h2>
+  <div class="bounty-row">
+    {% set sent_count = items|selectattr('status', 'equalto', 'sent')|list|length %}
+    {% for i in range(5) %}
+    <div class="bounty-slot {% if i < sent_count %}filled{% endif %}">
+      {{ '✓ sent' if i < sent_count else '$250' }}
+    </div>
+    {% endfor %}
+    <div class="dim bounty-note">{{ sent_count }} sent · quirks auto-log from API errors, warnings &amp; judge verdicts</div>
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">🐞 Log a quirk</h2>
+  <div class="form-card">
+    <div class="form-row">
+      <label>Area
+        <select id="fb-area">
+          <option>api</option><option>keys</option><option>markets</option>
+          <option>judging</option><option>rewards</option><option>docs</option>
+          <option>site</option><option>other</option>
+        </select>
+      </label>
+      <label>Title <input type="text" id="fb-title" maxlength="120" placeholder="One line, ≤120 chars"></label>
+    </div>
+    <label>What you tried / what happened / what you expected
+      <textarea id="fb-text" rows="4" maxlength="4000" placeholder="Include market address, submission id and request id when you have them."></textarea>
+    </label>
+    <div class="form-row">
+      <label>Market id <input type="text" id="fb-market" placeholder="0x… (optional)"></label>
+      <label>Submission id <input type="text" id="fb-submission" placeholder="(optional)"></label>
+      <button class="btn btn-primary" onclick="addFeedback()">Log quirk</button>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title"> Quirks &amp; reports <span class="dim">({{ items|length }})</span></h2>
+  {% if not items %}
+  <div class="empty">Nothing logged yet. Quirks appear automatically when the API or judge misbehaves.</div>
+  {% endif %}
+  <div class="feedback-list">
+    {% for f in items %}
+    <div class="feedback-card">
+      <div class="feedback-top">
+        <span class="chip">{{ f.area }}</span>
+        <span class="status-stamp stamp-{{ f.status }}">{{ f.status|upper }}</span>
+        <strong>{{ f.title }}</strong>
+        <span class="dim feedback-id">#{{ f.id }}</span>
+      </div>
+      <pre class="feedback-text">{{ f.text }}</pre>
+      <div class="feedback-meta dim">
+        {% if f.market_id %}market {{ f.market_id[:12] }}…{% endif %}
+        {% if f.submission_id %} · submission {{ f.submission_id[:16] }}…{% endif %}
+        {% if f.remote_id %} · remote {{ f.remote_id }}{% endif %}
+        · {{ f.created_at }}
+      </div>
+      {% if f.status != 'sent' %}
+      <button class="btn btn-primary btn-small" onclick="sendFeedback('{{ f.id }}')">
+        {{ 'Send to Delphi' if mode == 'live' else 'Capture to outbox (dry-run/mock)' }}
+      </button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}

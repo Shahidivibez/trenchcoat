@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Case file · Trenchcoat{% endblock %}
+{% block content %}
+
+<div class="case-header">
+  <a class="back" href="/">← Case board</a>
+  <div class="case-title-row">
+    <h1 class="case-title">{{ m.question }}</h1>
+    {% if m.delphi_url %}<a class="btn btn-ghost btn-small" href="{{ m.delphi_url }}" target="_blank" rel="noopener">Delphi ↗</a>{% endif %}
+  </div>
+  <div class="case-meta">
+    <span class="chip">{{ m.category_label or m.category }}</span>
+    <span class="chip">tier {{ m.market_tier }} · wave {{ m.wave }}</span>
+    <span class="chip odds-chip">YES {{ (m.odds_yes * 100)|round(1) }}% / NO {{ (m.odds_no * 100)|round(1) }}%</span>
+    {% set h = m.evidence_cutoff_at|hours_until %}
+    <span class="chip {% if h is not none and h < 12 %}chip-urgent{% endif %}">
+      evidence cutoff: {{ m.evidence_cutoff_at }}{% if h is not none %} ({{ h|round(1) }}h){% endif %}
+    </span>
+    <span class="chip">judgement pot {{ m.judgement_pot|usdc|round(0)|int }} USDC</span>
+  </div>
+  <div class="case-guards">
+    <div class="slot-meter" title="Every submission that gets an id uses a slot, whatever the verdict. Duplicates give it back.">
+      <span class="slot-label">Slots</span>
+      {% for i in range(3) %}
+      <span class="slot-dot {% if i < slots_used %}used{% endif %}"></span>
+      {% endfor %}
+      <span class="slot-text">{{ slots_used }}/3 used</span>
+    </div>
+    {% if locked_stance %}
+    <div class="stance-banner stance-{{ locked_stance|lower }}">
+      🔒 Stance locked: <strong>{{ locked_stance }}</strong> — opposing evidence would cancel out and is blocked.
+    </div>
+    {% else %}
+    <div class="stance-banner stance-open">Stance unlocked — first submission locks this market to YES or NO.</div>
+    {% endif %}
+  </div>
+</div>
+
+<details class="criteria">
+  <summary>📜 Resolution criteria &amp; listed sources (what the judge reads against)</summary>
+  <pre class="criteria-text">{{ m.resolution_criteria }}</pre>
+  <div class="sources">
+    <strong>Forecaster already reads:</strong>
+    {% for s in m.data_sources %}<a href="{{ s }}" target="_blank" rel="noopener">{{ s }}</a>{% endfor %}
+  </div>
+</details>
+
+<section class="section">
+  <h2 class="section-title">🔎 Evidence candidates <span class="dim">({{ candidates|length }})</span></h2>
+  {% if not candidates %}
+  <div class="empty">No candidates yet for this market. Run a scout from the case board.</div>
+  {% endif %}
+  <div class="evidence-grid">
+    {% for c in candidates %}
+    <div class="evidence-card status-{{ c.status }}" id="cand-{{ c.id }}">
+      <div class="evidence-top">
+        <span class="stance-tag stance-{{ c.stance|lower }}">{{ c.stance }}</span>
+        <span class="status-stamp stamp-{{ c.status }}">{{ c.status|upper }}</span>
+        {% if c.demo %}<span class="demo-tag">DEMO</span>{% endif %}
+        <span class="evidence-id">#{{ c.id }}</span>
+      </div>
+      <div class="evidence-claim">{{ c.claim }}</div>
+      <div class="score-bars">
+        <div class="score-bar"><span>relevance</span><div class="bar"><div style="width:{{ (c.relevance*100)|round|int }}%"></div></div><b>{{ '%.2f'|format(c.relevance) }}</b></div>
+        <div class="score-bar"><span>novelty</span><div class="bar"><div style="width:{{ (c.novelty*100)|round|int }}%"></div></div><b>{{ '%.2f'|format(c.novelty) }}</b></div>
+        <div class="score-bar"><span>Δ forecaster</span><div class="bar"><div style="width:{{ (c.forecaster_delta*100)|round|int }}%"></div></div><b>{{ '%.2f'|format(c.forecaster_delta) }}</b></div>
+        <div class="score-bar"><span>verifiability</span><div class="bar"><div style="width:{{ (c.verifiability*100)|round|int }}%"></div></div><b>{{ '%.2f'|format(c.verifiability) }}</b></div>
+        <div class="score-total">score <b>{{ '%.2f'|format(c.score) }}</b> · {{ c.item_count }}/3 items</div>
+      </div>
+      {% if c.score_rationale %}<div class="rationale">{{ c.score_rationale }}</div>{% endif %}
+      <details class="note-details">
+        <summary>Note ({{ c.note|length }} chars)</summary>
+        <pre class="note-text">{{ c.note }}</pre>
+      </details>
+      <div class="evidence-source">
+        {% for l in c.links %}<a href="{{ l }}" target="_blank" rel="noopener">🔗 {{ l[:70] }}{% if l|length > 70 %}…{% endif %}</a>{% endfor %}
+        {% for f in c.files %}<span class="file-chip">📎 {{ f.split('/')[-1] }}</span>{% endfor %}
+        {% if c.source_published_at %}<span class="dim">published {{ c.source_published_at }}</span>{% endif %}
+      </div>
+      {% if c.block_reason %}<div class="block-reason">⛔ {{ c.block_reason }}</div>{% endif %}
+      {% if c.status in ['draft', 'blocked'] %}
+      <div class="evidence-actions">
+        <button class="btn btn-primary btn-small" onclick="approveCandidate('{{ c.id }}')">✓ Approve &amp; submit</button>
+        <button class="btn btn-small" onclick="openEdit('{{ c.id }}')">✎ Edit</button>
+        <button class="btn btn-danger btn-small" onclick="discardCandidate('{{ c.id }}')">✕ Discard</button>
+      </div>
+      {% elif c.status == 'submitted' and c.submission_id %}
+      <div class="evidence-actions"><a class="btn btn-small" href="/receipts">Receipt {{ c.submission_id[:16] }}… →</a></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if submissions %}
+<section class="section">
+  <h2 class="section-title">🧾 Submissions on this market</h2>
+  <table class="table">
+    <thead><tr><th>id</th><th>stance</th><th>status</th><th>verdict</th><th>bounty</th><th>reason</th></tr></thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr>
+        <td class="mono">{{ s.id[:18] }}</td>
+        <td><span class="stance-tag stance-{{ s.stance|lower }}">{{ s.stance }}</span></td>
+        <td>{{ s.status }}</td>
+        <td><span class="verdict verdict-{{ s.verdict or 'pending' }}">{{ s.verdict or '—' }}</span></td>
+        <td>{{ '%.2f'|format(s.bounty_usdc) }} <span class="dim">{{ s.bounty_state }}</span></td>
+        <td class="reason-cell">{{ s.reason or '' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<!-- edit modal -->
+<div class="modal-backdrop" id="edit-modal" hidden>
+  <div class="modal">
+    <h3>✎ Edit evidence <span class="dim" id="edit-id"></span></h3>
+    <label>Stance
+      <select id="edit-stance"><option>YES</option><option>NO</option><option>NEUTRAL</option></select>
+    </label>
+    <label>Claim <input type="text" id="edit-claim" maxlength="300"></label>
+    <label>Note <textarea id="edit-note" rows="10" maxlength="8000"></textarea></label>
+    <label>Links (one per line, max 2 — note + links + files ≤ 3 items)
+      <textarea id="edit-links" rows="2"></textarea>
+    </label>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveEdit(false)">Save draft</button>
+      <button class="btn btn-primary" onclick="saveEdit(true)">Save &amp; submit</button>
+      <button class="btn btn-ghost" onclick="closeEdit()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+const CANDIDATES = {{ candidates_json|tojson }};
+</script>
+{% endblock %}

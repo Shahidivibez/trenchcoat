@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Settings · Trenchcoat{% endblock %}
+{% block content %}
+
+<section class="section">
+  <h2 class="section-title">⚙️ Configuration <span class="dim">(values redacted — presence only)</span></h2>
+  <div class="form-card">
+    <table class="table">
+      <tbody>
+        <tr><td>Mode</td><td><span class="mode-stamp mode-{{ summary.mode }}">{{ summary.mode|upper }}</span></td></tr>
+        <tr><td>Agent identity</td><td class="mono">{{ summary.agent_id }} / {{ summary.agent_harness }} / {{ summary.agent_model }}</td></tr>
+        <tr><td>Delphi API key</td><td>{{ '✅ set' if summary.delphi_key_set else '❌ not set — create a Mainnet key at api-access.delphi.fyi' }}</td></tr>
+        <tr><td>Wallet (for feedback)</td><td>{{ '✅ set' if summary.wallet_set else '❌ not set — DELPHI_WALLET_ADDRESS' }}</td></tr>
+        <tr><td>LLM providers</td><td>{{ summary.llm_providers|join(', ') if summary.llm_providers else 'none — offline heuristic mode (set GEMINI_API_KEY for real research)' }}</td></tr>
+        <tr><td>Search boosters</td><td>Serper {{ '✅' if summary.serper_set else '—' }} · Tavily {{ '✅' if summary.tavily_set else '—' }} (DDG + RSS always on)</td></tr>
+        <tr><td>Playwright screenshots</td><td>{{ 'enabled' if summary.playwright_enabled else 'disabled' }}</td></tr>
+        <tr><td>Autopilot</td><td>{{ 'ON — guarded auto-submit' if autopilot else 'OFF — Co-Pilot review required' }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">📋 Terms &amp; limits</h2>
+  <div class="form-card">
+    {% if api_error %}
+    <div class="block-reason">API check failed: {{ api_error }}</div>
+    {% endif %}
+    {% if terms %}
+    <p>Terms version <strong class="mono">{{ terms.version }}</strong> —
+      {% if terms.acceptedAt %}
+        ✅ accepted {{ terms.acceptedAt }}
+      {% else %}
+        ❌ not accepted. <a href="{{ terms.url }}" target="_blank" rel="noopener">Read the terms</a>, then accept below.
+      {% endif %}
+    </p>
+    {% if not terms.acceptedAt %}
+    <div class="form-row">
+      <label class="checkbox-label">
+        <input type="checkbox" id="terms-confirm"> I have read the terms and accept them for this account.
+      </label>
+      <button class="btn btn-primary" onclick="acceptTerms('{{ terms.version }}')">Accept terms {{ terms.version }}</button>
+    </div>
+    <p class="dim">Acceptance is once per account and covers every agent/key on it. Trenchcoat never accepts without your explicit click.</p>
+    {% endif %}
+    {% endif %}
+    {% if limits %}
+    <p class="mono">limits: {{ limits|tojson }}</p>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">🚀 Going live checklist</h2>
+  <div class="form-card checklist">
+    <div>1. Delphi account at delphi.fyi → note the wallet on your profile.</div>
+    <div>2. Register that wallet + "Trenchcoat" on DoraHacks (done ✓). Sync takes ~15 min.</div>
+    <div>3. Create a <strong>Mainnet</strong> API key at api-access.delphi.fyi → set DELPHI_API_ACCESS_KEY.</div>
+    <div>4. Set DELPHI_WALLET_ADDRESS (feedback bounties need it).</div>
+    <div>5. Set GEMINI_API_KEY (free tier) for real research; Groq/GitHub Models as fallback.</div>
+    <div>6. Run <code>trenchcoat doctor</code> → verify limits + terms.</div>
+    <div>7. Read &amp; accept the terms above (explicit consent).</div>
+    <div>8. Switch DELPHI_MODE=dry-run → scout → inspect outbox payloads.</div>
+    <div>9. Switch DELPHI_MODE=live → Co-Pilot approve your first real submission.</div>
+    <div>10. Watch receipts; keep autopilot off until accept rate is healthy.</div>
+  </div>
+</section>
+
+{% endblock %}

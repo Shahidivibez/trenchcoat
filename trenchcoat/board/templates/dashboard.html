@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="stat-row">
+  <div class="stat-card">
+    <div class="stat-label">Qualifier progress</div>
+    <div class="stat-big">{{ stats.judged_total }}<span class="stat-dim">/10 judged</span></div>
+    <div class="progress"><div class="progress-fill" style="width: {{ (stats.qualifier_submissions * 10) }}%"></div></div>
+    <div class="stat-sub">{{ stats.markets_covered }}/3 markets · {{ 'QUALIFIED ✓' if stats.qualified else 'not yet qualified' }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Earnings</div>
+    <div class="stat-big">{{ '%.2f'|format(stats.earned_usdc) }}<span class="stat-dim">USDC.e</span></div>
+    <div class="stat-sub">paid {{ '%.2f'|format(stats.paid_usdc) }} · held {{ '%.2f'|format(stats.held_usdc) }}</div>
+    <div class="stat-sub dim">settlement upside {{ '%.2f'|format(stats.settlement_potential_usdc) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Acceptance (last 6)</div>
+    <div class="stat-big">{{ (stats.recent_accept_rate * 100)|round|int if stats.recent_accept_rate is not none else '—' }}<span class="stat-dim">%</span></div>
+    <div class="stat-sub">{{ stats.accepted_total }} accepted / {{ stats.judged_total }} judged</div>
+    {% if stats.manipulation_strikes_24h > 0 %}<div class="stat-sub alert">⚠ manipulation strike in 24h — autopilot halted</div>{% endif %}
+  </div>
+  <div class="stat-card actions-card">
+    <div class="stat-label">Operations</div>
+    <button class="btn btn-primary" id="btn-scout" {% if run_state.running %}disabled{% endif %}>
+      {{ 'Scouting…' if run_state.running else '▶ Run scout' }}
+    </button>
+    <button class="btn" id="btn-poll">↻ Poll receipts</button>
+    <button class="btn btn-ghost" id="btn-demo">Seed demo</button>
+    <div class="stat-sub dim" id="run-status">
+      {% if run_state.running %}run in progress…{% elif run_state.last_report %}last run: {{ run_state.last_report.get('candidates_created', 0) }} candidates{% else %}idle{% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">📁 Case files <span class="dim">({{ markets|length }} markets)</span></h2>
+  {% if not markets %}
+  <div class="empty">No markets yet. Run a scout or seed the demo case load.</div>
+  {% endif %}
+  <div class="folder-grid">
+    {% for m in markets %}
+    {% set used = m.address and (ledger.get(m.address) is not none) %}
+    <a class="folder" href="/market/{{ m.address }}">
+      <div class="folder-tab">{{ m.category_label or m.category }}</div>
+      <div class="folder-body">
+        <div class="folder-question">{{ m.question }}</div>
+        <div class="folder-meta">
+          <span class="odds">YES {{ (m.odds_yes * 100)|round(1) }}%</span>
+          <span class="pot">{{ m.judgement_pot|usdc|round(0)|int }} USDC pot</span>
+        </div>
+        <div class="folder-meta">
+          {% set h = m.evidence_cutoff_at|hours_until %}
+          <span class="cutoff {% if h is not none and h < 12 %}urgent{% endif %}">
+            {% if h is none %}cutoff ?{% elif h <= 0 %}CUTOFF PASSED{% else %}cutoff {{ h|round(1) }}h{% endif %}
+          </span>
+          {% if ledger.get(m.address) %}
+          <span class="stance-lock stance-{{ ledger[m.address]['stance']|lower }}">locked {{ ledger[m.address]['stance'] }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+
+{% if drafts %}
+<section class="section">
+  <h2 class="section-title">🗂 Review queue <span class="dim">({{ drafts|length }} drafts awaiting approval)</span></h2>
+  <div class="queue">
+    {% for c in drafts[:6] %}
+    <div class="queue-item">
+      <span class="stance-tag stance-{{ c.stance|lower }}">{{ c.stance }}</span>
+      <span class="score-chip">{{ '%.2f'|format(c.score) }}</span>
+      <span class="queue-claim">{{ c.claim }}</span>
+      <a class="btn btn-small" href="/market/{{ c.market_address }}">Review →</a>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="section">
+  <h2 class="section-title">🧵 Activity</h2>
+  <div class="activity">
+    {% for e in events %}
+    <div class="event event-{{ e.kind }}">
+      <span class="event-ts">{{ e.ts[11:19] }}</span>
+      <span class="event-kind">{{ e.kind }}</span>
+      <span class="event-msg">{{ e.message }}</span>
+    </div>
+    {% else %}
+    <div class="empty">No activity yet.</div>
+    {% endfor %}
+  </div>
+</section>
+
+{% endblock %}
