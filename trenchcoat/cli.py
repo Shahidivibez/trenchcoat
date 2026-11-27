@@ -166,6 +166,32 @@ def cmd_terms(args) -> int:
     return 0
 
 
+def cmd_access_check(args) -> int:
+    """Official two-call access diagnosis (key-recovery.md step 1). Never prints the key."""
+    from .access import run_access_check
+
+    cfg = get_config()
+    res = run_access_check(cfg)
+    if args.json:
+        print(json.dumps(res, indent=2))
+        return 0 if res.get("verdict") == "ok" else 1
+    if res.get("error"):
+        print(res["error"])
+        return 1
+    print(f"Verdict: {res['verdict']}")
+    print(f"  {res['explanation']}")
+    print(f"  call A /limits        -> {res['call_a']['status']} {res['call_a']['code']}".rstrip())
+    print(f"  call B key service    -> {res['call_b']['status']} {res['call_b']['code']}".rstrip())
+    if res.get("issued_to_wallet"):
+        print(f"  key issued to wallet  -> {res['issued_to_wallet']}")
+    if res["call_a"].get("request_id"):
+        print(f"  requestId             -> {res['call_a']['request_id']}")
+    print("Next steps:")
+    for s in res["next_steps"]:
+        print(f"  - {s}")
+    return 0 if res["verdict"] == "ok" else 1
+
+
 def cmd_accept_terms(args) -> int:
     """Accept the CURRENT terms on the real account. Always uses the live API
     (never mock/dry-run) and requires explicit --yes consent. Idempotent: if the
@@ -299,6 +325,10 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--accept", metavar="VERSION", default=None)
     s.add_argument("--yes", action="store_true")
     s.set_defaults(fn=cmd_terms)
+
+    s = sub.add_parser("access-check", help="diagnose key/account/evidence access (official 2-call test)")
+    s.add_argument("--json", action="store_true")
+    s.set_defaults(fn=cmd_access_check)
 
     s = sub.add_parser("accept-terms", help="accept the CURRENT terms on the real account (needs --yes)")
     s.add_argument("--yes", action="store_true")

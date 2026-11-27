@@ -50,6 +50,9 @@ class Config:
             "DELPHI_FEEDBACK_URL", "https://feedback.delphi.fyi/v1/feedback"
         )
     )
+    key_service_url: str = field(
+        default_factory=lambda: os.getenv("DELPHI_KEY_SERVICE_URL", "https://api.delphi.fyi/me")
+    )
     agent_id: str = field(default_factory=lambda: os.getenv("DELPHI_AGENT_ID", "Trenchcoat"))
     agent_harness: str = field(default_factory=lambda: os.getenv("DELPHI_AGENT_HARNESS", "trenchcoat"))
     agent_model: str = field(default_factory=lambda: os.getenv("DELPHI_AGENT_MODEL", "gemini-2.5-flash"))

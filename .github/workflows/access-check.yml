@@ -1,0 +1,71 @@
+name: Delphi Access Check
+
+# Read-only diagnosis: runs the official two-call test from
+# https://competition.delphi.fyi/key-recovery.md and prints which wallet the key
+# was issued to, so you can compare it against your DoraHacks registration.
+# Sends nothing, accepts nothing, spends no slots. Never prints the key.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DELPHI_MODE: live
+      DELPHI_API_ACCESS_KEY: ${{ secrets.DELPHI_API_ACCESS_KEY }}
+      DELPHI_WALLET_ADDRESS: ${{ secrets.DELPHI_WALLET_ADDRESS }}
+      DELPHI_AGENT_ID: Trenchcoat
+      DELPHI_AGENT_HARNESS: github-actions
+      TRENCHCOAT_DATA_DIR: ./data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Access check (read-only)
+        run: |
+          set +e
+          OUT=$(trenchcoat access-check 2>&1); CODE=$?
+          echo "$OUT"
+          { echo '## Delphi access check'; echo '```'; echo "$OUT"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          # Surface as an annotation so it is readable via the API even where
+          # raw log download is unavailable. Wallet address is public, key is not printed.
+          echo "::notice title=Access check ($CODE)::$(echo "$OUT" | tr '\n' ' ' | sed 's/%/%25/g')"
+          exit 0
+
+      - name: Compare configured wallet vs key wallet
+        run: |
+          python - <<'PY'
+          import os, json
+          from trenchcoat.config import get_config
+          from trenchcoat.access import run_access_check
+          cfg = get_config()
+          res = run_access_check(cfg)
+          issued = (res.get("issued_to_wallet") or "").lower()
+          configured = (cfg.delphi_wallet or "").lower()
+          lines = ["## Wallet comparison", "```"]
+          lines.append(f"key issued to : {issued or '(unknown)'}")
+          lines.append(f"DELPHI_WALLET_ADDRESS secret: {configured or '(not set)'}")
+          if issued and configured:
+              lines.append("MATCH" if issued == configured else
+                           "MISMATCH — the secret is not the key's wallet. Feedback bounties "
+                           "need the key's wallet; DoraHacks must list this or your Delphi profile wallet.")
+          lines.append("```")
+          out = "\n".join(lines)
+          print(out)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write(out + "\n")
+          print("::notice title=Wallet comparison::" + out.replace("\n", " ").replace("%", "%25"))
+          PY
