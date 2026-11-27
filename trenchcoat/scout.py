@@ -9,7 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from .config import Config
+from .config import Config, resolve_autopilot
 from .delphi import DelphiAPIError, get_client
 from .guardrails import check_candidate, simhash64
 from .llm import LLMError, LLMRouter
@@ -138,8 +138,9 @@ def scout_run(cfg: Config, store: Store, max_markets: int | None = None,
     report = ScoutReport()
     client = get_client(cfg, store)
     llm = LLMRouter(cfg, store)
-    autopilot = cfg.autopilot if autopilot is None else autopilot
+    autopilot = resolve_autopilot(cfg, store, autopilot)
     max_markets = max_markets or cfg.max_markets_per_run
+    store.log("scout-mode", f"{'AUTOPILOT' if autopilot else 'CO-PILOT'} · delphi={cfg.delphi_mode}")
 
     # 1. markets
     try:

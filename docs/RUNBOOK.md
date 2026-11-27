@@ -29,7 +29,14 @@ optional `GEMINI_MODEL`, `DELPHI_AGENT_MODEL`.
   "Show terms" step, then re-run with the **confirm** box checked. (Locally: `trenchcoat accept-terms --yes`.)
 - State (SQLite + outbox + artifacts) persists via `actions/cache` (`trenchcoat-state-*`)
   and uploads as a per-run artifact. Download the artifact to inspect receipts/offline.
-- Manual dispatch inputs: mode, autopilot, max_markets, market filter, install_browser.
+- Manual dispatch inputs: mode, **autopilot = `inherit` | `on` | `off`**, max_markets,
+  market filter, install_browser. Use `on` for a one-off validate run; leave `inherit`
+  for normal runs.
+- **Autopilot precedence** (single source of truth, `config.resolve_autopilot`):
+  1. explicit flag — CLI `--autopilot`/`--co-pilot`, or dispatch input `on`/`off`
+  2. the board's persisted toggle (survives across runs — this is what cron uses)
+  3. `TRENCHCOAT_AUTOPILOT` env / repo variable (default)
+  So flipping the toggle on a hosted board also changes what the scheduled scout does.
 - The job summary shows qualifier progress + earnings after every run.
 - **Co-Pilot approvals** happen on the board (local/Docker). For headless approval,
   download the state artifact, run `trenchcoat review` / `approve <id>` locally with

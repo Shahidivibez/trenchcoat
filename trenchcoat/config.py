@@ -153,6 +153,25 @@ class Config:
         }
 
 
+def resolve_autopilot(cfg: Config, store, explicit: bool | None = None) -> bool:
+    """Single source of truth for the Co-Pilot/Autopilot decision.
+
+    Precedence (highest first):
+      1. explicit flag — CLI --autopilot/--co-pilot, or a per-run workflow input
+      2. board toggle persisted in the store (survives across runs/sessions)
+      3. TRENCHCOAT_AUTOPILOT env / repo variable (the default)
+
+    Without this, a scheduled run would ignore the board toggle and silently
+    fall back to the env default.
+    """
+    if explicit is not None:
+        return bool(explicit)
+    persisted = store.kv_get("autopilot")
+    if persisted is not None:
+        return persisted == "1"
+    return cfg.autopilot
+
+
 _config: Config | None = None
 
 

@@ -283,10 +283,9 @@ def create_app(cfg: Config | None = None) -> FastAPI:
 
 
 def _autopilot(cfg: Config, store: Store) -> bool:
-    v = store.kv_get("autopilot")
-    if v is None:
-        return cfg.autopilot
-    return v == "1"
+    from ..config import resolve_autopilot
+
+    return resolve_autopilot(cfg, store)
 
 
 def _now() -> str:
