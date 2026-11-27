@@ -166,6 +166,42 @@ def cmd_terms(args) -> int:
     return 0
 
 
+def cmd_accept_terms(args) -> int:
+    """Accept the CURRENT terms on the real account. Always uses the live API
+    (never mock/dry-run) and requires explicit --yes consent. Idempotent: if the
+    account already accepted this version, it reports that and exits cleanly."""
+    from .delphi.client import DelphiAPIError, LiveClient
+
+    cfg = get_config()
+    if not cfg.delphi_api_key:
+        print("DELPHI_API_ACCESS_KEY is required to accept terms on the real account.")
+        return 1
+    if not args.yes:
+        print("Refusing to accept terms without --yes (explicit human consent required).")
+        print("Run `trenchcoat terms` first and read the terms URL.")
+        return 1
+    client = LiveClient(cfg, _store())
+    try:
+        terms = client.get_terms().data
+        version = terms.get("version")
+        print(f"Current terms: version={version} url={terms.get('url')}")
+        if terms.get("acceptedAt"):
+            print(f"Already accepted at {terms['acceptedAt']} — nothing to do.")
+            return 0
+        if not version:
+            print("Could not read the current terms version.")
+            return 1
+        res = client.accept_terms(version)
+        print(json.dumps(res.data, indent=2))
+        print(f"Accepted terms {version}.")
+        return 0
+    except DelphiAPIError as e:
+        print(f"Accept failed: {e}")
+        if e.code == "unauthorized":
+            print("  -> check the key is Mainnet and the wallet has a Delphi account (key-recovery.md)")
+        return 1
+
+
 def cmd_feedback(args) -> int:
     from .models import FeedbackItem
     from .submit import send_feedback
@@ -251,6 +287,10 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--accept", metavar="VERSION", default=None)
     s.add_argument("--yes", action="store_true")
     s.set_defaults(fn=cmd_terms)
+
+    s = sub.add_parser("accept-terms", help="accept the CURRENT terms on the real account (needs --yes)")
+    s.add_argument("--yes", action="store_true")
+    s.set_defaults(fn=cmd_accept_terms)
 
     s = sub.add_parser("feedback", help="list/log/send feedback (bounty tracker)")
     s.add_argument("--add", metavar="TEXT", default=None)

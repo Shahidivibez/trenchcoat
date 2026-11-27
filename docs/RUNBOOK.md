@@ -23,6 +23,10 @@ optional `GROQ_API_KEY`, `GH_MODELS_TOKEN`, `SERPER_API_KEY`, `TAVILY_API_KEY`.
 **Repo variables**: `DELPHI_MODE` (`mock`/`dry-run`/`live`), `TRENCHCOAT_AUTOPILOT` (`0`/`1`),
 optional `GEMINI_MODEL`, `DELPHI_AGENT_MODEL`.
 
+- **Accept terms first (one-time):** the scout reads the real `entry-state`, which returns
+  `terms_not_accepted` until the account accepts. In pure Path B, run
+  **Actions → "Accept Delphi Terms" → Run workflow**, read the terms URL printed in the
+  "Show terms" step, then re-run with the **confirm** box checked. (Locally: `trenchcoat accept-terms --yes`.)
 - State (SQLite + outbox + artifacts) persists via `actions/cache` (`trenchcoat-state-*`)
   and uploads as a per-run artifact. Download the artifact to inspect receipts/offline.
 - Manual dispatch inputs: mode, autopilot, max_markets, market filter, install_browser.
