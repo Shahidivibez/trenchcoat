@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Receipts · Trenchcoat{% endblock %}
+{% block content %}
+
+<section class="stat-row">
+  <div class="stat-card">
+    <div class="stat-label">Judged</div>
+    <div class="stat-big">{{ stats.judged_total }}</div>
+    <div class="stat-sub">qualifier {{ stats.qualifier_submissions }}/10 across {{ stats.qualifier_markets }}/3 markets</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Earned</div>
+    <div class="stat-big">{{ '%.2f'|format(stats.earned_usdc) }}<span class="stat-dim">USDC.e</span></div>
+    <div class="stat-sub">paid {{ '%.2f'|format(stats.paid_usdc) }} · held {{ '%.2f'|format(stats.held_usdc) }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Settlement upside</div>
+    <div class="stat-big">{{ '%.2f'|format(stats.settlement_potential_usdc) }}<span class="stat-dim">USDC.e</span></div>
+    <div class="stat-sub dim">max additional if markets settle our way</div>
+  </div>
+  <div class="stat-card actions-card">
+    <div class="stat-label">Ledger</div>
+    <button class="btn" id="btn-poll">↻ Poll pending</button>
+    <a class="btn btn-ghost" href="/api/export" target="_blank">Export JSON</a>
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">🧾 All receipts</h2>
+  {% if not submissions %}
+  <div class="empty">No submissions yet. Approve a draft or run autopilot.</div>
+  {% else %}
+  <table class="table">
+    <thead>
+      <tr><th>id</th><th>market</th><th>stance</th><th>status</th><th>verdict</th><th>bounty</th><th>settlement ≤</th><th>reason</th><th>mode</th></tr>
+    </thead>
+    <tbody>
+    {% for s in submissions %}
+      <tr class="{% if s.verdict == 'manipulation' %}row-alert{% endif %}">
+        <td class="mono" title="{{ s.id }}">{{ s.id[:16] }}…</td>
+        <td><a href="/market/{{ s.market_address }}" class="mono">{{ s.market_address[:10] }}…</a></td>
+        <td><span class="stance-tag stance-{{ s.stance|lower }}">{{ s.stance }}</span></td>
+        <td>{{ s.status }}{% if s.can_retry %} <span class="chip chip-urgent">canRetry</span>{% endif %}</td>
+        <td><span class="verdict verdict-{{ s.verdict or 'pending' }}">{{ s.verdict or '—' }}</span></td>
+        <td>{{ '%.2f'|format(s.bounty_usdc) }} <span class="dim">{{ s.bounty_state }}</span>
+            {% if s.zero_pay_reason %}<span class="dim">({{ s.zero_pay_reason }})</span>{% endif %}</td>
+        <td>{{ '%.2f'|format(s.settlement_up_to_usdc) if s.settlement_up_to else '—' }}</td>
+        <td class="reason-cell">{{ s.reason or '' }}</td>
+        <td><span class="mode-stamp mode-{{ s.mode }} small">{{ s.mode }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+<section class="section">
+  <h2 class="section-title">🔒 Stance ledger</h2>
+  {% if not ledger %}
+  <div class="empty">No markets locked yet. The first submission on a market locks its stance.</div>
+  {% else %}
+  <table class="table">
+    <thead><tr><th>market</th><th>locked stance</th><th>via submission</th><th>locked at</th></tr></thead>
+    <tbody>
+    {% for addr, row in ledger.items() %}
+      <tr>
+        <td><a href="/market/{{ addr }}" class="mono">{{ addr[:14] }}…</a></td>
+        <td><span class="stance-tag stance-{{ row.stance|lower }}">{{ row.stance }}</span></td>
+        <td class="mono">{{ row.submission_id[:18] }}</td>
+        <td class="dim">{{ row.locked_at }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</section>
+
+{% endblock %}

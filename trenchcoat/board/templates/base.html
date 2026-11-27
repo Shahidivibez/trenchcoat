@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Trenchcoat Detective Board{% endblock %}</title>
+<link rel="stylesheet" href="/static/board.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>">
+</head>
+<body class="mode-{{ mode }}">
+<header class="topbar">
+  <a class="brand" href="/">
+    <span class="brand-icon">🕵️</span>
+    <span class="brand-name">TRENCHCOAT</span>
+    <span class="brand-sub">evidence mining · detective board</span>
+  </a>
+  <nav class="nav">
+    <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">Case Board</a>
+    <a href="/receipts" class="{% if request.url.path == '/receipts' %}active{% endif %}">Receipts</a>
+    <a href="/feedback" class="{% if request.url.path == '/feedback' %}active{% endif %}">Feedback</a>
+    <a href="/settings" class="{% if request.url.path == '/settings' %}active{% endif %}">Settings</a>
+  </nav>
+  <div class="topbar-right">
+    <span class="mode-stamp mode-{{ mode }}">{{ mode|upper }}</span>
+    <label class="toggle" title="Autopilot submits guarded drafts without review. Co-Pilot (off) waits for your approval.">
+      <input type="checkbox" id="autopilot-toggle" {% if autopilot %}checked{% endif %}>
+      <span class="toggle-track"><span class="toggle-thumb"></span></span>
+      <span class="toggle-label" id="autopilot-label">{{ 'AUTOPILOT' if autopilot else 'CO-PILOT' }}</span>
+    </label>
+  </div>
+</header>
+
+{% if mode == 'mock' %}
+<div class="banner banner-mock">MOCK MODE — simulated judge &amp; receipts. No real submissions. Set DELPHI_MODE=dry-run or live with your Mainnet key to go real.</div>
+{% elif mode == 'dry-run' %}
+<div class="banner banner-dry">DRY-RUN — reads hit the real API; submissions are captured to data/outbox/ and judged locally. Nothing is sent.</div>
+{% else %}
+<div class="banner banner-live">LIVE MODE — submissions spend real slots and earn real USDC.e. Guardrails are active.</div>
+{% endif %}
+
+<main class="board">
+{% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <span>Trenchcoat v0.1 · Gensyn/Delphi Agent Arena · 25 Nov – 11 Dec 2026</span>
+  <span class="footer-stats" id="footer-stats">
+    judged {{ stats.judged_total }} · markets {{ stats.markets_covered }} · earned {{ '%.2f'|format(stats.earned_usdc) }} USDC
+  </span>
+</footer>
+
+<div id="toasts" class="toasts"></div>
+<script src="/static/board.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

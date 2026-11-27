@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trenchcoat"
+version = "0.1.0"
+description = "Trenchcoat — autonomous evidence-mining agent for the Gensyn/Delphi Agent Arena (Evidence Mining). Co-pilot first, receipts always."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Trenchcoat" }]
+dependencies = [
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.9",
+    "trafilatura>=1.12",
+    "pypdf>=4.0",
+    "feedparser>=6.0",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.45"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[project.scripts]
+trenchcoat = "trenchcoat.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["trenchcoat*"]
+
+[tool.setuptools.package-data]
+"trenchcoat.board" = ["templates/*.html", "static/*"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

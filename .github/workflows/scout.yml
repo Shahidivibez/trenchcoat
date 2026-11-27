@@ -1,0 +1,112 @@
+name: Trenchcoat Scout
+
+on:
+  schedule:
+    # Every 6 hours during the competition window (25 Nov – 11 Dec 2026).
+    # Disable or delete this workflow after the competition closes.
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Delphi mode"
+        type: choice
+        options: [mock, dry-run, live]
+        default: dry-run
+      autopilot:
+        description: "Auto-submit guarded drafts (otherwise Co-Pilot queue only)"
+        type: boolean
+        default: false
+      max_markets:
+        description: "Max markets to research this run"
+        type: string
+        default: "4"
+      market:
+        description: "Optional market filter (address or question substring)"
+        type: string
+        default: ""
+      install_browser:
+        description: "Install Playwright Chromium for screenshots"
+        type: boolean
+        default: true
+
+concurrency:
+  group: trenchcoat-scout
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  scout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DELPHI_MODE: ${{ inputs.mode || vars.DELPHI_MODE || 'mock' }}
+      TRENCHCOAT_AUTOPILOT: ${{ inputs.autopilot && '1' || vars.TRENCHCOAT_AUTOPILOT || '0' }}
+      TRENCHCOAT_DATA_DIR: ./data
+      DELPHI_API_ACCESS_KEY: ${{ secrets.DELPHI_API_ACCESS_KEY }}
+      DELPHI_WALLET_ADDRESS: ${{ secrets.DELPHI_WALLET_ADDRESS }}
+      DELPHI_AGENT_ID: Trenchcoat
+      DELPHI_AGENT_HARNESS: github-actions
+      DELPHI_AGENT_MODEL: ${{ vars.DELPHI_AGENT_MODEL || 'gemini-2.5-flash' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      GITHUB_MODELS_TOKEN: ${{ secrets.GH_MODELS_TOKEN }}
+      SERPER_API_KEY: ${{ secrets.SERPER_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # Persist SQLite state across runs without committing binaries to git.
+      - name: Restore agent state
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: trenchcoat-state-${{ github.run_id }}
+          restore-keys: |
+            trenchcoat-state-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+
+      - name: Install Chromium (screenshots)
+        if: ${{ inputs.install_browser != false }}
+        run: python -m playwright install --with-deps chromium
+
+      - name: Doctor (key / terms / limits)
+        run: trenchcoat doctor || true
+
+      - name: Scout
+        run: |
+          trenchcoat scout \
+            --max-markets "${{ inputs.max_markets || '4' }}" \
+            ${{ inputs.market && format('--market "{0}"', inputs.market) || '' }} \
+            ${{ (inputs.autopilot || vars.TRENCHCOAT_AUTOPILOT == '1') && '--autopilot' || '--co-pilot' }}
+
+      - name: Poll receipts
+        run: trenchcoat poll || true
+
+      - name: Job summary
+        if: always()
+        run: trenchcoat status --markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload state + outbox artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trenchcoat-run-${{ github.run_number }}
+          path: |
+            data/trenchcoat.db
+            data/outbox/
+            data/artifacts/
+          retention-days: 14
+          if-no-files-found: ignore
