@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
+      # MUST be live: terms acceptance is a real account action. Without this the
+      # 'show terms' step would read the MOCK client and prove nothing.
+      DELPHI_MODE: live
       DELPHI_API_ACCESS_KEY: ${{ secrets.DELPHI_API_ACCESS_KEY }}
       DELPHI_AGENT_ID: Trenchcoat
       DELPHI_AGENT_HARNESS: github-actions
@@ -41,11 +44,29 @@ jobs:
           pip install -e .
 
       - name: Show current terms (read the URL before accepting)
-        run: trenchcoat terms
+        run: |
+          set +e
+          OUT=$(trenchcoat terms 2>&1); CODE=$?
+          echo "$OUT"
+          { echo '## Current terms (live API)'; echo '```'; echo "$OUT"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ $CODE -ne 0 ]; then
+            echo "::error title=Terms read failed::$(echo "$OUT" | tr '\n' ' ' | sed 's/%/%25/g')"
+            exit $CODE
+          fi
 
       - name: Accept terms (only with explicit consent)
         if: ${{ inputs.confirm }}
-        run: trenchcoat accept-terms --yes
+        run: |
+          set +e
+          OUT=$(trenchcoat accept-terms --yes 2>&1); CODE=$?
+          echo "$OUT"
+          { echo '## Terms acceptance'; echo '```'; echo "$OUT"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ $CODE -ne 0 ]; then
+            # Surface the real API error as an annotation (readable via the API,
+            # unlike raw logs which some environments cannot download).
+            echo "::error title=Terms acceptance failed::$(echo "$OUT" | tr '\n' ' ' | sed 's/%/%25/g')"
+            exit $CODE
+          fi
 
       - name: Refuse without consent
         if: ${{ !inputs.confirm }}

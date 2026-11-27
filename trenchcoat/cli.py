@@ -197,8 +197,20 @@ def cmd_accept_terms(args) -> int:
         return 0
     except DelphiAPIError as e:
         print(f"Accept failed: {e}")
+        print(f"  code={e.code} status={e.status} request_id={e.request_id}")
         if e.code == "unauthorized":
-            print("  -> check the key is Mainnet and the wallet has a Delphi account (key-recovery.md)")
+            print("  -> key must be MAINNET from api-access.delphi.fyi, same sign-in as delphi.fyi.")
+            print("  -> if the key shows Active, the wallet may have no Delphi account: sign in once")
+            print("     at delphi.fyi, wait a minute, retry. See competition.delphi.fyi/key-recovery.md")
+        elif e.code == "not_found":
+            print("  -> DoraHacks wallet must match the Delphi profile wallet; sync takes ~15 min.")
+        elif e.code == "forbidden":
+            print("  -> request came from a sanctioned region; stop.")
+        elif e.code == "invalid_request" and e.field == "termsVersion":
+            print("  -> terms version changed; re-run to read the current version.")
+        return 1
+    except Exception as e:  # network/parse faults: report type so it is diagnosable
+        print(f"Accept failed unexpectedly: {type(e).__name__}: {e}")
         return 1
 
 
